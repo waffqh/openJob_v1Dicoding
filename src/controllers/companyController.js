@@ -6,9 +6,7 @@ export const addCompanyHandler = async (req, res) => {
 
     return res.status(201).json({
       status: "success",
-      data: {
-        addedCompany: result,
-      },
+      data: result,
     });
   } catch (error) {
     if (error.name === "InvariantError") {
@@ -45,15 +43,11 @@ export const getCompaniesHandler = async (req, res) => {
 
 export const getCompanyByIdHandler = async (req, res) => {
   try {
-    const company = await companyService.getCompanyById(
-      req.params.id
-    );
+    const company = await companyService.getCompanyById(req.params.id);
 
     return res.status(200).json({
       status: "success",
-      data: {
-        company,
-      },
+      data: company,
     });
   } catch (error) {
     return res.status(404).json({
@@ -65,10 +59,7 @@ export const getCompanyByIdHandler = async (req, res) => {
 
 export const updateCompanyHandler = async (req, res) => {
   try {
-    await companyService.updateCompanyById(
-      req.params.id,
-      req.body
-    );
+    await companyService.updateCompanyById(req.params.id, req.body);
 
     return res.status(200).json({
       status: "success",

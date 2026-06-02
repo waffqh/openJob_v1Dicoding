@@ -41,3 +41,18 @@ export const getJobByIdHandler = async (req, res) => {
     return res.status(500).json({ status: 'failed', message: error.message });
   }
 };
+
+const getJobById = async (id) => {
+  const query = {
+    text: 'SELECT * FROM jobs WHERE id = $1',
+    values: [id],
+  };
+
+  const result = await pool.query(query);
+
+  if (!result.rows.length) {
+    throw new Error('Job tidak ditemukan');
+  }
+
+  return result.rows[0];
+};

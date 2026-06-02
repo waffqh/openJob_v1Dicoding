@@ -1,11 +1,16 @@
-import pool from '../config/database.js';
-import { nanoid } from 'nanoid';
+import pool from "../config/database.js";
+import { nanoid } from "nanoid";
 
 const addJob = async ({
-  title,
-  description,
   company_id,
   category_id,
+  title,
+  description,
+  location,
+  job_type,
+  experience_level,
+  location_type,
+  status = 'open',
 }) => {
   const id = `job-${nanoid(16)}`;
 
@@ -13,20 +18,30 @@ const addJob = async ({
     text: `
       INSERT INTO jobs(
         id,
+        company_id,
+        category_id,
         title,
         description,
-        company_id,
-        category_id
+   
+        job_type,
+        experience_level,
+        location_type,
+        status
       )
-      VALUES($1, $2, $3, $4, $5)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING id
     `,
     values: [
       id,
-      title,
-      description,
       company_id,
       category_id,
+      title,
+      description,
+
+      job_type,
+      experience_level,
+      location_type,
+      status,
     ],
   };
 
@@ -37,7 +52,7 @@ const addJob = async ({
 
 const getJobs = async () => {
   const result = await pool.query(
-    'SELECT * FROM jobs'
+    "SELECT * FROM jobs"
   );
 
   return result.rows;
