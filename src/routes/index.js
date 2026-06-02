@@ -22,7 +22,7 @@ import categoryService from "../services/categoryService.js";
 import { categorySchema } from "../validators/categoryValidator.js";
 
 import jobService from "../services/jobService.js";
-import { jobSchema } from "../validators/jobValidator.js";
+import { jobSchema, updateJobSchema } from "../validators/jobValidator.js";
 
 import applicationService from "../services/applicationService.js";
 import { applicationSchema } from "../validators/applicationValidator.js";
@@ -257,9 +257,7 @@ router.post("/jobs", auth, validate(jobSchema), async (req, res) => {
 
     res.status(201).json({
       status: "success",
-      data: {
-        addedJob: result,
-      },
+      data: result,
     });
   } catch (error) {
     res.status(400).json({
@@ -293,9 +291,7 @@ router.get("/jobs/:id", async (req, res) => {
 
     res.status(200).json({
       status: "success",
-      data: {
-        job,
-      },
+      data: job,
     });
   } catch (error) {
     res.status(404).json({
@@ -307,7 +303,7 @@ router.get("/jobs/:id", async (req, res) => {
 
 router.get("/jobs/company/:id", async (req, res) => {
   try {
-    const jobs = await jobService.getJobsByCompanyId(req.params.id);
+    const jobs = await jobService.getJobByCompanyId(req.params.id);
 
     res.status(200).json({
       status: "success",
@@ -325,7 +321,7 @@ router.get("/jobs/company/:id", async (req, res) => {
 
 router.get("/jobs/category/:id", async (req, res) => {
   try {
-    const jobs = await jobService.getJobsByCategoryId(req.params.id);
+    const jobs = await jobService.getJobByCategoryId(req.params.id);
 
     res.status(200).json({
       status: "success",
@@ -341,9 +337,16 @@ router.get("/jobs/category/:id", async (req, res) => {
   }
 });
 
-router.put("/jobs/:id", auth, async (req, res) => {
+router.put("/jobs/:id", auth, async (req, res, next) => {
   try {
-    await jobService.updateJobById(req.params.id, req.body);
+    const { error, value } = updateJobSchema.validate(req.body);
+    if (error) {
+      return res.status(404).json({
+        status: "failed",
+        message: error.message,
+      });
+    }
+    await jobService.updateJob(req.params.id, req.body);
 
     res.status(200).json({
       status: "success",
@@ -359,14 +362,18 @@ router.put("/jobs/:id", auth, async (req, res) => {
 
 router.delete("/jobs/:id", auth, async (req, res) => {
   try {
-    await jobService.deleteJobById(req.params.id);
+    await jobService.deleteJob(req.params.id);
 
     res.status(200).json({
       status: "success",
       message: "Job deleted",
     });
   } catch (error) {
-    res.status(404).json({
+    // Tambahkan log penanda khusus di sini
+    console.error("=== ERROR INI FIX BERASAL DARI ROUTE DELETE ===");
+    console.error(error.message);
+
+    res.status(500).json({
       status: "failed",
       message: error.message,
     });
