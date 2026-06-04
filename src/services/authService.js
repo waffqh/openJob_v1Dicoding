@@ -27,15 +27,23 @@ const login = async ({ email, password }) => {
     throw new Error("Password salah");
   }
 
-  const accessToken = jwt.sign({ id: user.id }, ACCESS_TOKEN_KEY, {
-    expiresIn: "3h",
-  });
+  const accessToken = jwt.sign(
+    { id: user.id, email: user.email },
+    ACCESS_TOKEN_KEY,
+    {
+      expiresIn: "3h",
+    },
+  );
 
-  const refreshToken = jwt.sign({ id: user.id }, REFRESH_TOKEN_KEY);
+  const refreshToken = jwt.sign(
+    { id: user.id, email: user.email },
+    REFRESH_TOKEN_KEY,
+    { expiresIn: "7d" },
+  );
 
   await pool.query({
     text: `
-      INSERT INTO authentications(token)
+      INSERT INTO authentications (token)
       VALUES($1)
     `,
     values: [refreshToken],

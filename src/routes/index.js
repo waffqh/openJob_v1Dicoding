@@ -102,6 +102,7 @@ router.post("/authentications", validate(authSchema), async (req, res) => {
 router.put("/authentications", async (req, res) => {
   try {
     const JWT_REFRESH_SECRET = process.env.REFRESH_TOKEN_KEY;
+    const JWT_ACCESS_SECRET = process.env.ACCESS_TOKEN_KEY;
     const { refreshToken } = req.body;
     if (!refreshToken) {
       return res.status(400).json({
@@ -134,7 +135,7 @@ router.put("/authentications", async (req, res) => {
 
     const newAccessToken = jwt.sign(
       { id: decoded.id, email: decoded.email },
-      ACCESS_TOKEN_KEY,
+      JWT_ACCESS_SECRET,
       { expiresIn: "1h" },
     );
 
@@ -152,7 +153,7 @@ router.put("/authentications", async (req, res) => {
   }
 });
 
-router.delete("/authentications", async (req, res) => {
+router.delete("/authentications", auth, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {

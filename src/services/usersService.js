@@ -1,17 +1,12 @@
-import pool from '../config/database.js';
-import bcrypt from 'bcrypt';
-import { nanoid } from 'nanoid';
+import pool from "../config/database.js";
+import bcrypt from "bcrypt";
+import { customAlphabet } from "nanoid";
 
-const addUser = async ({
-  name,
-  email,
-  password,
-  role = 'user',
-}) => {
-  const hashedPassword = await bcrypt.hash(
-    password,
-    10
-  );
+const nanoid = customAlphabet(
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+);
+const addUser = async ({ name, email, password, role = "user" }) => {
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   const id = `user-${nanoid(16)}`;
 
@@ -27,13 +22,7 @@ const addUser = async ({
       VALUES($1, $2, $3, $4, $5)
       RETURNING id, name, email
     `,
-    values: [
-      id,
-      name,
-      email,
-      hashedPassword,
-      role,
-    ],
+    values: [id, name, email, hashedPassword, role],
   };
 
   const result = await pool.query(query);
@@ -53,8 +42,8 @@ const getUserById = async (id) => {
 
   // Jika user tidak ditemukan, lempar NotFoundError agar ditangkap 404 oleh controller
   if (!result.rows.length) {
-    const error = new Error('User tidak ditemukan');
-    error.name = 'NotFoundError';
+    const error = new Error("User tidak ditemukan");
+    error.name = "NotFoundError";
     throw error;
   }
 
