@@ -1,6 +1,7 @@
 import pool from "../config/database.js";
 import bcrypt from "bcrypt";
 import { customAlphabet } from "nanoid";
+import cache from "../utils/cache.js";
 
 const nanoid = customAlphabet(
   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
@@ -30,8 +31,19 @@ const addUser = async ({ name, email, password, role = "user" }) => {
   return result.rows[0];
 };
 
-const getUserById = async (id) => {
-  const result = await pool.query({
+const getUserById = async (res, id) => {
+  const cacheKey = `user:${id}`;
+  const cached = cache.get(cacheKey);
+
+  if (cached) {
+    res.set("X-Data-Source", "cache");
+    return res.status(200).json({
+      status: "success",
+      data: cached,
+    });
+  }
+
+  const users = await pool.query({
     text: `
       SELECT id, name, email
       FROM users
@@ -40,14 +52,17 @@ const getUserById = async (id) => {
     values: [id],
   });
 
-  // Jika user tidak ditemukan, lempar NotFoundError agar ditangkap 404 oleh controller
-  if (!result.rows.length) {
+  if (!users.rows.length) {
     const error = new Error("User tidak ditemukan");
     error.name = "NotFoundError";
     throw error;
   }
 
-  return result.rows[0];
+  res.set("X-Data-Source", "database");
+
+  await cache.set(cacheKey, users);
+
+  return users.rows[0];
 };
 
 export default {

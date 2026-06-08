@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "amqplib": "^2.0.1",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -20,7 +21,9 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "nanoid": "^5.1.11",
-    "pg": "^8.21.0"
+    "nodemailer": "^8.0.10",
+    "pg": "^8.21.0",
+    "redis": "^6.0.0"
   },
   "devDependencies": {
     "node-pg-migrate": "^8.0.4",

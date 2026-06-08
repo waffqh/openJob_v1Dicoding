@@ -59,7 +59,7 @@ const getApplications = async () => {
   return result.rows.map(formatApplication);
 };
 
-const getApplicationsById = async (id) => {
+const getApplicationsById = async (res, id) => {
   const result = await pool.query("SELECT * FROM applications WHERE id =$1", [
     id,
   ]);

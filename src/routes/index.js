@@ -63,7 +63,7 @@ router.post("/users", validate(userSchema), async (req, res) => {
 
 router.get("/users/:id", async (req, res) => {
   try {
-    const user = await usersService.getUserById(req.params.id);
+    const user = await usersService.getUserById(res, req.params.id);
 
     res.status(200).json({
       status: "success",
@@ -509,7 +509,10 @@ router.get("/applications", auth, async (req, res) => {
 
 router.get("/applications/:id", auth, async (req, res) => {
   try {
-    const result = await applicationService.getApplicationsById(req.params.id);
+    const result = await applicationService.getApplicationsById(
+      res,
+      req.params.id,
+    );
 
     res.status(200).json({
       status: "success",

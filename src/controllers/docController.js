@@ -39,8 +39,6 @@ const DocumentController = {
         [id],
       );
 
-      console.log(result.rows, id);
-
       if (result.rows.length === 0) {
         return next(
           res
@@ -70,7 +68,9 @@ const DocumentController = {
     try {
       if (!req.file) {
         return next(
-          res.status(400).json({ status: "failed", message: "File required" }),
+          res
+            .status(400)
+            .json({ status: "failed", message: "File is required" }),
         );
       }
 

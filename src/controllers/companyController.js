@@ -46,7 +46,6 @@ export const getCompanyByIdHandler = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const company = await companyService.getCompanyById(id);
     const cacheKey = `companies:${id}`;
 
     const cached = await cache.get(cacheKey);
@@ -57,6 +56,7 @@ export const getCompanyByIdHandler = async (req, res) => {
         data: cached,
       });
     }
+    const company = await companyService.getCompanyById(id);
 
     res.set("X-Data-Source", "database");
 
