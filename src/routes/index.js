@@ -36,6 +36,9 @@ import {
 import bookmarkService from "../services/bookmarkService.js";
 import { bookmarkSchema } from "../validators/bookmarkValidator.js";
 
+import upload from "../middleware/upload.js";
+import documentController from "../controllers/docController.js";
+import DocumentController from "../controllers/docController.js";
 const router = express.Router();
 
 /* USERS */
@@ -250,7 +253,10 @@ router.post("/jobs/:id/bookmark", auth, async (req, res) => {
 
 router.get("/jobs/:id/bookmark/:bookmarkId", auth, async (req, res) => {
   try {
-    const result = await bookmarkService.getBookmarkById(req.params.bookmarkId);
+    const { id, bookmarkId } = req.params;
+
+    console.log(id, bookmarkId);
+    const result = await bookmarkService.getBookmarkById(bookmarkId, id);
 
     res.status(200).json({
       status: "success",
@@ -621,7 +627,7 @@ router.post("/bookmarks", auth, validate(bookmarkSchema), async (req, res) => {
 
 router.get("/bookmarks", auth, async (req, res) => {
   try {
-    const bookmarks = await bookmarkService.getBookmarks();
+    const bookmarks = await bookmarkService.getBookmarks(req.user.id);
 
     res.status(200).json({
       status: "success",
@@ -655,5 +661,16 @@ router.delete("/jobs/:id/bookmark", auth, async (req, res) => {
     });
   }
 });
+
+router.get("/documents/", DocumentController.getAll);
+router.get("/documents/:id", DocumentController.getById);
+
+router.post(
+  "/documents/",
+  auth,
+  upload.single("document"),
+  DocumentController.upload,
+);
+router.delete("/documents/:id", auth, DocumentController.remove);
 
 export default router;

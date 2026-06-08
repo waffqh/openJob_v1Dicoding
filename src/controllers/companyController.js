@@ -1,4 +1,5 @@
 import companyService from "../services/companyService.js";
+import cache from "../utils/cache.js";
 
 export const addCompanyHandler = async (req, res) => {
   try {
@@ -43,8 +44,23 @@ export const getCompaniesHandler = async (req, res) => {
 
 export const getCompanyByIdHandler = async (req, res) => {
   try {
-    const company = await companyService.getCompanyById(req.params.id);
+    const { id } = req.params;
 
+    const company = await companyService.getCompanyById(id);
+    const cacheKey = `companies:${id}`;
+
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      res.set("X-Data-Source", "cache");
+      return res.status(200).json({
+        status: "success",
+        data: cached,
+      });
+    }
+
+    res.set("X-Data-Source", "database");
+
+    await cache.set(cacheKey, company);
     return res.status(200).json({
       status: "success",
       data: company,
