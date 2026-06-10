@@ -40,11 +40,10 @@ const DocumentController = {
       );
 
       if (result.rows.length === 0) {
-        return next(
-          res
-            .status(404)
-            .json({ status: "failed", message: "Document not found" }),
-        );
+        return res.status(404).json({
+          status: "failed",
+          message: "Document not found",
+        });
       }
 
       const file = result.rows[0];
@@ -67,11 +66,10 @@ const DocumentController = {
   async upload(req, res, next) {
     try {
       if (!req.file) {
-        return next(
-          res
-            .status(400)
-            .json({ status: "failed", message: "File is required" }),
-        );
+        return res.status(400).json({
+          status: "failed",
+          message: "File is required",
+        });
       }
 
       const userId = req.user.id;
@@ -110,22 +108,18 @@ const DocumentController = {
       );
 
       if (existing.rows.length === 0) {
-        return next(
-          res
-            .status(404)
-            .json({ status: "failed", message: "Document not found" }),
-        );
+        return res.status(404).json({
+          status: "failed",
+          message: "Document not found",
+        });
       }
 
       // Hanya pemilik dokumen yang bisa hapus
       if (existing.rows[0].user_id !== userId) {
-        return next(
-          //   new AuthorizationError("You are not allowed to delete this document"),
-          res.status(403).json({
-            status: "failed",
-            message: "You are not allowed to delete this document",
-          }),
-        );
+        return res.status(403).json({
+          status: "failed",
+          message: "You are not allowed to delete this document",
+        });
       }
 
       // Hapus file fisik dari disk

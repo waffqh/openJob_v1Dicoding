@@ -1,6 +1,13 @@
 import pool from "../config/database.js";
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import { formatApplication } from "../utils/undex.js";
+import { publishApplicationNotification } from "../rabbitmq/producer.js";
+import cache from "../utils/cache.js";
+
+const nanoid = customAlphabet(
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+  12,
+);
 
 const APPLICATION_SELECT = `
   a.id,
@@ -31,25 +38,43 @@ const APPLICATION_JOIN = `
 `;
 
 const addApplication = async ({ user_id, job_id, status }) => {
-  const id = `application-${nanoid(16)}`;
+  const job = await pool.query("SELECT id, status FROM jobs WHERE id = $1", [
+    job_id,
+  ]);
 
-  const query = {
-    text: `
-      INSERT INTO applications(
-        id,
-        user_id,
-        job_id,
-        status
-      )
-      VALUES($1, $2, $3, $4)
-      RETURNING id
-    `,
-    values: [id, user_id, job_id, status],
-  };
+  if (job.rows.length === 0) {
+    throw new Error("Job not found");
+  }
 
-  const result = await pool.query(query);
+  if (job.rows[0].status === "closed") {
+    throw new Error("This job is no longer accepting applications");
+  }
 
-  return result.rows[0];
+  const existing = await pool.query(
+    "SELECT id FROM applications WHERE user_id = $1 AND job_id = $2",
+    [user_id, job_id],
+  );
+
+  if (existing.rows.length > 0) {
+    throw new Error("You have already applied for this job");
+  }
+
+  const id = `application-${nanoid()}`;
+
+  const result = await pool.query(
+    `INSERT INTO applications (id, user_id, job_id, status)
+         VALUES ($1, $2, $3, 'pending')
+         RETURNING *`,
+    [id, user_id, job_id],
+  );
+
+  await cache.del(`applications:user:${user_id}`, `applications:job:${job_id}`);
+
+  await publishApplicationNotification({
+    applicationId: id,
+  });
+
+  return formatApplication(result.rows[0]);
 };
 
 const getApplications = async () => {
@@ -59,10 +84,14 @@ const getApplications = async () => {
   return result.rows.map(formatApplication);
 };
 
-const getApplicationsById = async (res, id) => {
+const getApplicationsById = async (id) => {
   const result = await pool.query("SELECT * FROM applications WHERE id =$1", [
     id,
   ]);
+
+  if (!result.rows.length) {
+    throw new Error("Applications tidak ditemukan");
+  }
 
   return result.rows[0];
 };
@@ -119,6 +148,7 @@ const deleteApplicationsById = async (id) => {
     `SELECT * FROM applications WHERE id = $1`,
     [id],
   );
+
   if (!existing.rows.length) {
     throw new Error("Applications tidak ditemukan");
   }

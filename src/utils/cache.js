@@ -1,6 +1,6 @@
 import { client } from "../redis.js";
 
-const DEFAULT_TTL = 300;
+const DEFAULT_TTL = 3600;
 
 const cache = {
   async get(key) {

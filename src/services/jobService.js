@@ -5,6 +5,28 @@ const nanoid = customAlphabet(
   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
 );
 
+const JOB_SELECT = `
+  j.id,
+  j.title,
+  j.description,
+  j.job_type,
+  j.experience_level,
+  j.location_type,
+  j.location_city,
+  j.status,
+  c.id          AS company_id,
+  c.name        AS company_name,
+  c.location    AS company_location,
+  cat.id        AS category_id,
+  cat.name      AS category_name
+`;
+
+const JOB_JOIN = `
+  FROM jobs j
+  JOIN companies c    ON j.company_id  = c.id
+  JOIN categories cat ON j.category_id = cat.id
+`;
+
 const addJob = async ({
   company_id,
   category_id,
@@ -18,6 +40,7 @@ const addJob = async ({
   salary_max,
   is_salary_visible,
   status = "open",
+  created_by,
 }) => {
   const id = `job-${nanoid(16)}`;
 
@@ -36,9 +59,10 @@ const addJob = async ({
         experience_level,
         location_type,
         location_city,
-        status
+        status,
+        created_by
       )
-      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `,
     values: [
@@ -55,6 +79,7 @@ const addJob = async ({
       location_type,
       location_city,
       status,
+      created_by,
     ],
   };
 
@@ -63,8 +88,29 @@ const addJob = async ({
   return result.rows[0];
 };
 
-const getJobs = async () => {
-  const result = await pool.query("SELECT * FROM jobs");
+const getJobs = async (query) => {
+  const { title, "company-name": companyName } = query;
+
+  const conditions = [];
+  const params = [];
+
+  if (title) {
+    params.push(`%${title}%`);
+    conditions.push(`j.title ILIKE $${params.length}`);
+  }
+
+  if (companyName) {
+    params.push(`%${companyName}%`);
+    conditions.push(`c.name ILIKE $${params.length}`);
+  }
+
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  // const result = await pool.query("SELECT * FROM jobs");
+  const result = await pool.query(
+    `SELECT ${JOB_SELECT} ${JOB_JOIN} ${whereClause} ORDER BY j.created_at DESC`,
+    params,
+  );
 
   return result.rows;
 };
@@ -72,7 +118,7 @@ const getJobs = async () => {
 const getJobById = async (id) => {
   const result = await pool.query(`SELECT * FROM jobs WHERE id = $1`, [id]);
   if (!result.rows.length) {
-    throw new Error("Category tidak ditemukan");
+    throw new Error("Job tidak ditemukan");
   }
   return result.rows[0];
 };

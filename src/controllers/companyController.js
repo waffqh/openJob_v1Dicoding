@@ -77,6 +77,8 @@ export const updateCompanyHandler = async (req, res) => {
   try {
     await companyService.updateCompanyById(req.params.id, req.body);
 
+    await cache.del(`companies:${req.params.id}`);
+
     return res.status(200).json({
       status: "success",
       message: "company berhasil diperbarui",
@@ -91,6 +93,8 @@ export const updateCompanyHandler = async (req, res) => {
 
 export const deleteCompanyHandler = async (req, res) => {
   try {
+    await cache.del(`companies:${req.params.id}`);
+
     await companyService.deleteCompanyById(req.params.id);
 
     return res.status(200).json({

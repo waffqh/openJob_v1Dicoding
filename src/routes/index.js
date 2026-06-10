@@ -39,6 +39,7 @@ import { bookmarkSchema } from "../validators/bookmarkValidator.js";
 import upload from "../middleware/upload.js";
 import documentController from "../controllers/docController.js";
 import DocumentController from "../controllers/docController.js";
+import cache from "../utils/cache.js";
 const router = express.Router();
 
 /* USERS */
@@ -52,8 +53,6 @@ router.post("/users", validate(userSchema), async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error(error);
-
     return res.status(500).json({
       status: "failed",
       message: error.message,
@@ -63,7 +62,23 @@ router.post("/users", validate(userSchema), async (req, res) => {
 
 router.get("/users/:id", async (req, res) => {
   try {
-    const user = await usersService.getUserById(res, req.params.id);
+    const { id } = req.params;
+    const cacheKey = `user:${id}`;
+
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      res.set("X-Data-Source", "cache");
+      return res.status(200).json({
+        status: "success",
+        data: cached,
+      });
+    }
+
+    const user = await usersService.getUserById(id);
+
+    await cache.set(cacheKey, user);
+
+    res.set("X-Data-Source", "database");
 
     res.status(200).json({
       status: "success",
@@ -199,10 +214,43 @@ router.get("/profile", auth, async (req, res) => {
   res.status(200).json({
     status: "success",
     data: {
-      userId: req.user.id,
-      message: "Protected route berhasil diakses",
+      id: req.user.id,
     },
   });
+});
+
+router.put("/users/:id", auth, validate(userSchema), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id !== id) {
+      return res.status(403).json({
+        status: "failed",
+        message: "Anda hanya dapat mengubah data diri sendiri",
+      });
+    }
+
+    const result = await usersService.updateUser(id, req.body);
+
+    await cache.del(`user:${id}`);
+
+    return res.status(200).json({
+      status: "success",
+      message: "User berhasil diperbarui",
+      data: result,
+    });
+  } catch (error) {
+    if (error.name === "NotFoundError") {
+      return res.status(404).json({
+        status: "failed",
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      status: "failed",
+      message: error.message,
+    });
+  }
 });
 
 /* COMPANIES */
@@ -255,7 +303,6 @@ router.get("/jobs/:id/bookmark/:bookmarkId", auth, async (req, res) => {
   try {
     const { id, bookmarkId } = req.params;
 
-    console.log(id, bookmarkId);
     const result = await bookmarkService.getBookmarkById(bookmarkId, id);
 
     res.status(200).json({
@@ -340,7 +387,10 @@ router.delete("/categories/:id", auth, async (req, res) => {
 
 router.post("/jobs", auth, validate(jobSchema), async (req, res) => {
   try {
-    const result = await jobService.addJob(req.body);
+    const result = await jobService.addJob({
+      ...req.body,
+      created_by: req.user.id,
+    });
 
     res.status(201).json({
       status: "success",
@@ -356,7 +406,7 @@ router.post("/jobs", auth, validate(jobSchema), async (req, res) => {
 
 router.get("/jobs", async (req, res) => {
   try {
-    const jobs = await jobService.getJobs();
+    const jobs = await jobService.getJobs(req.query);
 
     res.status(200).json({
       status: "success",
@@ -456,9 +506,6 @@ router.delete("/jobs/:id", auth, async (req, res) => {
       message: "Job deleted",
     });
   } catch (error) {
-    console.error("=== ERROR INI FIX BERASAL DARI ROUTE DELETE ===");
-    console.error(error.message);
-
     res.status(500).json({
       status: "failed",
       message: error.message,
@@ -475,6 +522,12 @@ router.post(
   async (req, res) => {
     try {
       const result = await applicationService.addApplication(req.body);
+
+      const { user_id, job_id } = req.body;
+      await cache.del(
+        `application:user:${user_id}`,
+        `application:job:${job_id}`,
+      );
 
       res.status(201).json({
         status: "success",
@@ -500,6 +553,13 @@ router.get("/applications", auth, async (req, res) => {
       },
     });
   } catch (error) {
+    if (error.message.includes("tidak ditemukan")) {
+      return res.status(404).json({
+        status: "failed",
+        message: error.message,
+      });
+    }
+
     res.status(500).json({
       status: "failed",
       message: error.message,
@@ -509,16 +569,37 @@ router.get("/applications", auth, async (req, res) => {
 
 router.get("/applications/:id", auth, async (req, res) => {
   try {
-    const result = await applicationService.getApplicationsById(
-      res,
-      req.params.id,
-    );
+    const { id } = req.params;
+
+    const cacheKey = `application:${id}`;
+    const cached = await cache.get(cacheKey);
+
+    if (cached) {
+      res.set("X-Data-Source", "cache");
+      return res.status(200).json({
+        status: "success",
+        data: cached,
+      });
+    }
+
+    const result = await applicationService.getApplicationsById(id);
+
+    await cache.set(cacheKey, result);
+
+    res.set("X-Data-Source", "database");
 
     res.status(200).json({
       status: "success",
       data: result,
     });
   } catch (error) {
+    if (error.message.includes("tidak ditemukan")) {
+      return res.status(404).json({
+        status: "failed",
+        message: error.message,
+      });
+    }
+
     res.status(500).json({
       status: "failed",
       message: error.message,
@@ -528,9 +609,28 @@ router.get("/applications/:id", auth, async (req, res) => {
 
 router.get("/applications/user/:id", auth, async (req, res) => {
   try {
+    const { id } = req.params;
+
+    const cacheKey = `application:user:${id}`;
+    const cached = await cache.get(cacheKey);
+
+    if (cached) {
+      res.set("X-Data-Source", "cache");
+      return res.status(200).json({
+        status: "success",
+        data: {
+          applications: cached,
+        },
+      });
+    }
+
     const result = await applicationService.getApplicationsByUserId(
       req.params.id,
     );
+
+    await cache.set(cacheKey, result);
+
+    res.set("X-Data-Source", "database");
 
     res.status(200).json({
       status: "success",
@@ -548,9 +648,26 @@ router.get("/applications/user/:id", auth, async (req, res) => {
 
 router.get("/applications/job/:id", auth, async (req, res) => {
   try {
-    const result = await applicationService.getApplicationsByJobId(
-      req.params.id,
-    );
+    const { id } = req.params;
+
+    const cacheKey = `application:job:${id}`;
+    const cached = await cache.get(cacheKey);
+
+    if (cached) {
+      res.set("X-Data-Source", "cache");
+      return res.status(200).json({
+        status: "success",
+        data: {
+          applications: cached,
+        },
+      });
+    }
+
+    const result = await applicationService.getApplicationsByJobId(id);
+
+    await cache.set(cacheKey, result);
+
+    res.set("X-Data-Source", "database");
 
     res.status(200).json({
       status: "success",
@@ -575,14 +692,32 @@ router.put("/applications/:id", auth, async (req, res, next) => {
         message: error.message,
       });
     }
-    await applicationService.updateApplicationsById(req.params.id, req.body);
+
+    const { id } = req.params;
+    const existingApp = await applicationService.getApplicationsById(id);
+    const { user_id, job_id } = existingApp;
+
+    await applicationService.updateApplicationsById(id, req.body);
+
+    await cache.del(
+      `application:${id}`,
+      `application:user:${user_id}`,
+      `application:job:${job_id}`,
+    );
 
     res.status(200).json({
       status: "success",
       message: "Applications updated",
     });
   } catch (error) {
-    res.status(404).json({
+    if (error.message.includes("tidak ditemukan")) {
+      return res.status(404).json({
+        status: "failed",
+        message: error.message,
+      });
+    }
+
+    res.status(500).json({
       status: "failed",
       message: error.message,
     });
@@ -591,15 +726,30 @@ router.put("/applications/:id", auth, async (req, res, next) => {
 
 router.delete("/applications/:id", auth, async (req, res) => {
   try {
-    await applicationService.deleteApplicationsById(req.params.id);
+    const { id } = req.params;
+
+    const existingApp = await applicationService.getApplicationsById(id);
+    const { user_id, job_id } = existingApp;
+
+    await applicationService.deleteApplicationsById(id);
+
+    await cache.del(
+      `application:${id}`,
+      `application:user:${user_id}`,
+      `application:job:${job_id}`,
+    );
 
     res.status(200).json({
       status: "success",
       message: "Applications deleted",
     });
   } catch (error) {
-    console.error("=== ERROR INI FIX BERASAL DARI ROUTE DELETE ===");
-    console.error(error.message);
+    if (error.message.includes("tidak ditemukan")) {
+      return res.status(404).json({
+        status: "failed",
+        message: error.message,
+      });
+    }
 
     res.status(500).json({
       status: "failed",
@@ -613,6 +763,9 @@ router.delete("/applications/:id", auth, async (req, res) => {
 router.post("/bookmarks", auth, validate(bookmarkSchema), async (req, res) => {
   try {
     const result = await bookmarkService.addBookmark(req.body);
+
+    const { id: userId } = req.user;
+    await cache.del(`bookmark:${userId}`);
 
     res.status(201).json({
       status: "success",
@@ -630,7 +783,26 @@ router.post("/bookmarks", auth, validate(bookmarkSchema), async (req, res) => {
 
 router.get("/bookmarks", auth, async (req, res) => {
   try {
-    const bookmarks = await bookmarkService.getBookmarks(req.user.id);
+    const { id } = req.user;
+
+    const cacheKey = `bookmark:${id}`;
+    const cached = await cache.get(cacheKey);
+
+    if (cached) {
+      res.set("X-Data-Source", "cache");
+      return res.status(200).json({
+        status: "success",
+        data: {
+          bookmarks: cached,
+        },
+      });
+    }
+
+    const bookmarks = await bookmarkService.getBookmarks(id);
+
+    await cache.set(cacheKey, bookmarks);
+
+    res.set("X-Data-Source", "database");
 
     res.status(200).json({
       status: "success",
@@ -648,7 +820,13 @@ router.get("/bookmarks", auth, async (req, res) => {
 
 router.delete("/jobs/:id/bookmark", auth, async (req, res) => {
   try {
+    const { id: userId } = req.user;
+
+    // Delete from database FIRST (critical operation)
     await bookmarkService.deleteBookmark(req.params.id);
+
+    // Then invalidate cache (non-blocking, optional)
+    await cache.del(`bookmark:${userId}`);
 
     res.status(200).json({
       status: "success",
